@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.git/
+.env
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+*.db
+tests/
+AGENTS.md
+CLOUD_ATLAS_CHALLENGE_SPECIFICATION.md
+CLOUD_ATLAS_IMPLEMENTATION_BRIEF.md
