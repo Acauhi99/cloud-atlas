@@ -17,6 +17,19 @@ docker compose up --build        # run with Docker
 
 All commands use `uv run`. Never `pip install` or run tools outside uv.
 
+## Pre-Commit Checks (Lefthook)
+
+Every code change must pass these checks before commit. Lefthook runs them automatically on `git commit`:
+
+```bash
+uv run ruff format --check .   # formatting
+uv run ruff check .            # lint
+uv run mypy app                # typecheck
+uv run pytest                  # tests
+```
+
+Setup: `lefthook install` (runs once per clone). If any check fails, the commit is blocked.
+
 ## Project Structure
 
 ```

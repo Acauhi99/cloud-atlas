@@ -1,12 +1,10 @@
 import asyncio
 import uuid
-from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
 
 
-@pytest.mark.asyncio
 async def test_create_tag(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.post(
         "/tags",
@@ -21,7 +19,6 @@ async def test_create_tag(client: AsyncClient, user_id: uuid.UUID):
     assert data["values"] == []
 
 
-@pytest.mark.asyncio
 async def test_create_tag_with_values(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.post(
         "/tags",
@@ -42,7 +39,6 @@ async def test_create_tag_with_values(client: AsyncClient, user_id: uuid.UUID):
     assert data["values"][1]["name"] == "val-two"
 
 
-@pytest.mark.asyncio
 async def test_list_tags(client: AsyncClient, user_id: uuid.UUID):
     # Create two tags
     await client.post(
@@ -60,7 +56,6 @@ async def test_list_tags(client: AsyncClient, user_id: uuid.UUID):
     assert "tag-b" in names
 
 
-@pytest.mark.asyncio
 async def test_get_tag(client: AsyncClient, user_id: uuid.UUID):
     create_resp = await client.post(
         "/tags", json={"name": "get-me"}, headers={"X-User-ID": str(user_id)}
@@ -71,7 +66,6 @@ async def test_get_tag(client: AsyncClient, user_id: uuid.UUID):
     assert resp.json()["name"] == "get-me"
 
 
-@pytest.mark.asyncio
 async def test_update_tag(client: AsyncClient, user_id: uuid.UUID):
     create_resp = await client.post(
         "/tags", json={"name": "update-me"}, headers={"X-User-ID": str(user_id)}
@@ -87,7 +81,6 @@ async def test_update_tag(client: AsyncClient, user_id: uuid.UUID):
     assert resp.json()["description"] == "new desc"
 
 
-@pytest.mark.asyncio
 async def test_delete_tag(client: AsyncClient, user_id: uuid.UUID):
     create_resp = await client.post(
         "/tags", json={"name": "delete-me"}, headers={"X-User-ID": str(user_id)}
@@ -100,7 +93,6 @@ async def test_delete_tag(client: AsyncClient, user_id: uuid.UUID):
     assert get_resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_delete_tag_cascades_values(client: AsyncClient, user_id: uuid.UUID):
     create_resp = await client.post(
         "/tags",
@@ -117,14 +109,12 @@ async def test_delete_tag_cascades_values(client: AsyncClient, user_id: uuid.UUI
     assert values_resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_get_nonexistent_tag_returns_404(client: AsyncClient, user_id: uuid.UUID):
     fake_id = str(uuid.uuid4())
     resp = await client.get(f"/tags/{fake_id}", headers={"X-User-ID": str(user_id)})
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_duplicate_tag_name_returns_409(client: AsyncClient, user_id: uuid.UUID):
     await client.post(
         "/tags", json={"name": "dup-tag"}, headers={"X-User-ID": str(user_id)}
@@ -135,7 +125,6 @@ async def test_duplicate_tag_name_returns_409(client: AsyncClient, user_id: uuid
     assert resp.status_code == 409
 
 
-@pytest.mark.asyncio
 async def test_different_users_can_have_same_tag_name(client: AsyncClient):
     uid1 = str(uuid.uuid4())
     uid2 = str(uuid.uuid4())
@@ -149,7 +138,6 @@ async def test_different_users_can_have_same_tag_name(client: AsyncClient):
     assert resp2.status_code == 201
 
 
-@pytest.mark.asyncio
 async def test_user_cannot_see_other_users_tag(client: AsyncClient):
     uid1 = str(uuid.uuid4())
     uid2 = str(uuid.uuid4())
@@ -161,19 +149,16 @@ async def test_user_cannot_see_other_users_tag(client: AsyncClient):
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_missing_user_header_returns_422(client: AsyncClient):
     resp = await client.get("/tags")
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_invalid_uuid_returns_422(client: AsyncClient):
     resp = await client.get("/tags", headers={"X-User-ID": "not-a-uuid"})
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_invalid_name_too_short(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.post(
         "/tags", json={"name": "ab"}, headers={"X-User-ID": str(user_id)}
@@ -181,7 +166,6 @@ async def test_invalid_name_too_short(client: AsyncClient, user_id: uuid.UUID):
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_invalid_name_uppercase(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.post(
         "/tags", json={"name": "BadName"}, headers={"X-User-ID": str(user_id)}
@@ -189,7 +173,6 @@ async def test_invalid_name_uppercase(client: AsyncClient, user_id: uuid.UUID):
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_invalid_name_spaces(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.post(
         "/tags", json={"name": "has space"}, headers={"X-User-ID": str(user_id)}
@@ -197,7 +180,6 @@ async def test_invalid_name_spaces(client: AsyncClient, user_id: uuid.UUID):
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_pagination(client: AsyncClient, user_id: uuid.UUID):
     for i in range(5):
         await client.post(
@@ -215,7 +197,6 @@ async def test_pagination(client: AsyncClient, user_id: uuid.UUID):
     assert len(data["items"]) == 2
 
 
-@pytest.mark.asyncio
 async def test_filter_by_name(client: AsyncClient, user_id: uuid.UUID):
     await client.post(
         "/tags", json={"name": "filter-alpha"}, headers={"X-User-ID": str(user_id)}
@@ -231,7 +212,6 @@ async def test_filter_by_name(client: AsyncClient, user_id: uuid.UUID):
     assert data["items"][0]["name"] == "filter-alpha"
 
 
-@pytest.mark.asyncio
 async def test_invalid_name_too_long(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.post(
         "/tags",
@@ -241,7 +221,6 @@ async def test_invalid_name_too_long(client: AsyncClient, user_id: uuid.UUID):
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_empty_patch_body_returns_422(client: AsyncClient, user_id: uuid.UUID):
     create_resp = await client.post(
         "/tags", json={"name": "patch-empty"}, headers={"X-User-ID": str(user_id)}
@@ -255,7 +234,6 @@ async def test_empty_patch_body_returns_422(client: AsyncClient, user_id: uuid.U
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_nested_duplicate_value_names_rejected(
     client: AsyncClient, user_id: uuid.UUID
 ):
@@ -270,68 +248,38 @@ async def test_nested_duplicate_value_names_rejected(
 # --- Concurrent IntegrityError ---
 
 
-@pytest.mark.asyncio
 async def test_concurrent_duplicate_tag_returns_409(client: AsyncClient):
-    barrier = asyncio.Barrier(2)
     user = str(uuid.uuid4())
-
-    original_commit = None
-
-    async def slow_commit(self):
-        await barrier.wait()
-        await original_commit(self)
-
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    original_commit = AsyncSession.commit
-
-    with patch.object(AsyncSession, "commit", slow_commit):
-        results = await asyncio.gather(
-            client.post(
-                "/tags",
-                json={"name": "concurrent-tag"},
-                headers={"X-User-ID": user},
-            ),
-            client.post(
-                "/tags",
-                json={"name": "concurrent-tag"},
-                headers={"X-User-ID": user},
-            ),
-        )
-
+    results = await asyncio.gather(
+        client.post(
+            "/tags",
+            json={"name": "concurrent-tag"},
+            headers={"X-User-ID": user},
+        ),
+        client.post(
+            "/tags",
+            json={"name": "concurrent-tag"},
+            headers={"X-User-ID": user},
+        ),
+    )
     codes = {r.status_code for r in results}
     assert codes == {201, 409}
 
 
-@pytest.mark.asyncio
 async def test_session_usable_after_concurrent_conflict(client: AsyncClient):
-    barrier = asyncio.Barrier(2)
     user = str(uuid.uuid4())
-
-    original_commit = None
-
-    async def slow_commit(self):
-        await barrier.wait()
-        await original_commit(self)
-
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    original_commit = AsyncSession.commit
-
-    with patch.object(AsyncSession, "commit", slow_commit):
-        await asyncio.gather(
-            client.post(
-                "/tags",
-                json={"name": "conflict-session"},
-                headers={"X-User-ID": user},
-            ),
-            client.post(
-                "/tags",
-                json={"name": "conflict-session"},
-                headers={"X-User-ID": user},
-            ),
-        )
-
+    await asyncio.gather(
+        client.post(
+            "/tags",
+            json={"name": "conflict-session"},
+            headers={"X-User-ID": user},
+        ),
+        client.post(
+            "/tags",
+            json={"name": "conflict-session"},
+            headers={"X-User-ID": user},
+        ),
+    )
     resp = await client.post(
         "/tags",
         json={"name": "after-conflict"},
@@ -343,7 +291,6 @@ async def test_session_usable_after_concurrent_conflict(client: AsyncClient):
 # --- Rollback & session recovery ---
 
 
-@pytest.mark.asyncio
 async def test_failed_nested_value_rolls_back_entire_tag(
     client: AsyncClient, user_id: uuid.UUID
 ):
@@ -362,7 +309,6 @@ async def test_failed_nested_value_rolls_back_entire_tag(
     assert list_resp.json()["total"] == 0
 
 
-@pytest.mark.asyncio
 async def test_session_usable_after_failed_nested_creation(
     client: AsyncClient, user_id: uuid.UUID
 ):
@@ -385,7 +331,6 @@ async def test_session_usable_after_failed_nested_creation(
 # --- Cross-user mutation ---
 
 
-@pytest.mark.asyncio
 async def test_user_cannot_update_other_users_tag(client: AsyncClient):
     uid1 = str(uuid.uuid4())
     uid2 = str(uuid.uuid4())
@@ -401,7 +346,6 @@ async def test_user_cannot_update_other_users_tag(client: AsyncClient):
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_user_cannot_delete_other_users_tag(client: AsyncClient):
     uid1 = str(uuid.uuid4())
     uid2 = str(uuid.uuid4())
@@ -416,7 +360,6 @@ async def test_user_cannot_delete_other_users_tag(client: AsyncClient):
 # --- UUID path param ---
 
 
-@pytest.mark.asyncio
 async def test_invalid_uuid_in_path_returns_422(
     client: AsyncClient, user_id: uuid.UUID
 ):
@@ -427,7 +370,6 @@ async def test_invalid_uuid_in_path_returns_422(
 # --- Description null ---
 
 
-@pytest.mark.asyncio
 async def test_description_can_be_null(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.post(
         "/tags",
@@ -438,7 +380,6 @@ async def test_description_can_be_null(client: AsyncClient, user_id: uuid.UUID):
     assert resp.json()["description"] is None
 
 
-@pytest.mark.asyncio
 async def test_description_omitted_is_null(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.post(
         "/tags", json={"name": "no-desc"}, headers={"X-User-ID": str(user_id)}
@@ -450,7 +391,6 @@ async def test_description_omitted_is_null(client: AsyncClient, user_id: uuid.UU
 # --- Name special characters ---
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "bad_name",
     ["tag@name", "tag#name", "tag!name", "tag.name", "tag name", "TAG-name"],
@@ -467,7 +407,6 @@ async def test_invalid_name_special_chars(
 # --- Pagination edge cases ---
 
 
-@pytest.mark.asyncio
 async def test_pagination_page_beyond_total(client: AsyncClient, user_id: uuid.UUID):
     await client.post(
         "/tags", json={"name": "pg-one"}, headers={"X-User-ID": str(user_id)}
@@ -480,7 +419,6 @@ async def test_pagination_page_beyond_total(client: AsyncClient, user_id: uuid.U
     assert data["total"] >= 1
 
 
-@pytest.mark.asyncio
 async def test_pagination_page_size_one(client: AsyncClient, user_id: uuid.UUID):
     for i in range(3):
         await client.post(
@@ -499,7 +437,6 @@ async def test_pagination_page_size_one(client: AsyncClient, user_id: uuid.UUID)
 # --- Deterministic ordering ---
 
 
-@pytest.mark.asyncio
 async def test_list_tags_deterministic_order(client: AsyncClient, user_id: uuid.UUID):
     for name in ["zebra", "alpha", "middle"]:
         await client.post(
@@ -515,7 +452,6 @@ async def test_list_tags_deterministic_order(client: AsyncClient, user_id: uuid.
 # --- Error response format ---
 
 
-@pytest.mark.asyncio
 async def test_error_response_format(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.get(
         "/tags/" + str(uuid.uuid4()), headers={"X-User-ID": str(user_id)}
@@ -529,7 +465,6 @@ async def test_error_response_format(client: AsyncClient, user_id: uuid.UUID):
     assert "instance" in body
 
 
-@pytest.mark.asyncio
 async def test_conflict_error_response_format(client: AsyncClient, user_id: uuid.UUID):
     await client.post(
         "/tags", json={"name": "conflict-fmt"}, headers={"X-User-ID": str(user_id)}
@@ -546,14 +481,12 @@ async def test_conflict_error_response_format(client: AsyncClient, user_id: uuid
 # --- Request ID ---
 
 
-@pytest.mark.asyncio
 async def test_request_id_returned_in_header(client: AsyncClient, user_id: uuid.UUID):
     resp = await client.get("/tags", headers={"X-User-ID": str(user_id)})
     assert "x-request-id" in resp.headers
     assert len(resp.headers["x-request-id"]) > 0
 
 
-@pytest.mark.asyncio
 async def test_request_id_echoed_from_client(client: AsyncClient, user_id: uuid.UUID):
     custom_id = "my-req-id-123"
     resp = await client.get(
@@ -566,16 +499,18 @@ async def test_request_id_echoed_from_client(client: AsyncClient, user_id: uuid.
 # --- Tag response includes values ---
 
 
-@pytest.mark.asyncio
 async def test_tag_response_includes_values_list(
     client: AsyncClient, user_id: uuid.UUID
 ):
     resp = await client.post(
         "/tags",
-        json={"name": "with-vals", "values": [{"name": "v1"}, {"name": "v2"}]},
+        json={
+            "name": "with-vals",
+            "values": [{"name": "val-one"}, {"name": "val-two"}],
+        },
         headers={"X-User-ID": str(user_id)},
     )
     data = resp.json()
     assert isinstance(data["values"], list)
     assert len(data["values"]) == 2
-    assert {v["name"] for v in data["values"]} == {"v1", "v2"}
+    assert {v["name"] for v in data["values"]} == {"val-one", "val-two"}

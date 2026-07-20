@@ -2,6 +2,7 @@ import logging
 import time
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from app.api.error_handlers import app_error_handler
@@ -13,6 +14,12 @@ from app.exceptions import AppError
 setup_logging(settings.log_level)
 
 app = FastAPI(title="Cloud Atlas Tags API", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.add_exception_handler(AppError, app_error_handler)  # type: ignore[arg-type]
 app.include_router(health.router)
 app.include_router(tags.router)

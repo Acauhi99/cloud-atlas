@@ -1,10 +1,10 @@
+import asyncio
 import uuid
 
 import pytest
 from httpx import AsyncClient
 
 
-@pytest.mark.asyncio
 async def test_create_value(client: AsyncClient, user_id: uuid.UUID):
     tag_resp = await client.post(
         "/tags", json={"name": "val-parent"}, headers={"X-User-ID": str(user_id)}
@@ -21,7 +21,6 @@ async def test_create_value(client: AsyncClient, user_id: uuid.UUID):
     assert data["description"] == "val desc"
 
 
-@pytest.mark.asyncio
 async def test_list_values(client: AsyncClient, user_id: uuid.UUID):
     tag_resp = await client.post(
         "/tags", json={"name": "list-parent"}, headers={"X-User-ID": str(user_id)}
@@ -46,7 +45,6 @@ async def test_list_values(client: AsyncClient, user_id: uuid.UUID):
     assert "lv-b" in names
 
 
-@pytest.mark.asyncio
 async def test_get_value(client: AsyncClient, user_id: uuid.UUID):
     tag_resp = await client.post(
         "/tags", json={"name": "get-parent"}, headers={"X-User-ID": str(user_id)}
@@ -65,7 +63,6 @@ async def test_get_value(client: AsyncClient, user_id: uuid.UUID):
     assert resp.json()["name"] == "get-val"
 
 
-@pytest.mark.asyncio
 async def test_update_value(client: AsyncClient, user_id: uuid.UUID):
     tag_resp = await client.post(
         "/tags", json={"name": "upd-parent"}, headers={"X-User-ID": str(user_id)}
@@ -86,7 +83,6 @@ async def test_update_value(client: AsyncClient, user_id: uuid.UUID):
     assert resp.json()["name"] == "updated-val"
 
 
-@pytest.mark.asyncio
 async def test_delete_value(client: AsyncClient, user_id: uuid.UUID):
     tag_resp = await client.post(
         "/tags", json={"name": "del-parent"}, headers={"X-User-ID": str(user_id)}
@@ -108,7 +104,6 @@ async def test_delete_value(client: AsyncClient, user_id: uuid.UUID):
     assert get_resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_value_nonexistent_tag_returns_404(
     client: AsyncClient, user_id: uuid.UUID
 ):
@@ -119,7 +114,6 @@ async def test_value_nonexistent_tag_returns_404(
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_value_cross_user_access_denied(client: AsyncClient):
     uid1 = str(uuid.uuid4())
     uid2 = str(uuid.uuid4())
@@ -139,7 +133,6 @@ async def test_value_cross_user_access_denied(client: AsyncClient):
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_duplicate_value_name_in_same_tag_returns_409(
     client: AsyncClient, user_id: uuid.UUID
 ):
@@ -160,7 +153,6 @@ async def test_duplicate_value_name_in_same_tag_returns_409(
     assert resp.status_code == 409
 
 
-@pytest.mark.asyncio
 async def test_empty_patch_body_returns_422(client: AsyncClient, user_id: uuid.UUID):
     tag_resp = await client.post(
         "/tags", json={"name": "patch-parent"}, headers={"X-User-ID": str(user_id)}
@@ -180,7 +172,6 @@ async def test_empty_patch_body_returns_422(client: AsyncClient, user_id: uuid.U
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_same_value_name_in_different_tags_allowed(
     client: AsyncClient, user_id: uuid.UUID
 ):
@@ -207,7 +198,6 @@ async def test_same_value_name_in_different_tags_allowed(
 # --- Value name validation ---
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "bad_name",
     ["ab", "A", "tag@val", "tag#val", "tag.val", "tag val", "A" * 65],
@@ -230,7 +220,6 @@ async def test_invalid_value_name(
 # --- Description null ---
 
 
-@pytest.mark.asyncio
 async def test_value_description_can_be_null(client: AsyncClient, user_id: uuid.UUID):
     tag_resp = await client.post(
         "/tags", json={"name": "null-vdesc"}, headers={"X-User-ID": str(user_id)}
@@ -245,7 +234,6 @@ async def test_value_description_can_be_null(client: AsyncClient, user_id: uuid.
     assert resp.json()["description"] is None
 
 
-@pytest.mark.asyncio
 async def test_value_description_omitted_is_null(
     client: AsyncClient, user_id: uuid.UUID
 ):
@@ -265,7 +253,6 @@ async def test_value_description_omitted_is_null(
 # --- Cross-user value mutation ---
 
 
-@pytest.mark.asyncio
 async def test_user_cannot_update_other_users_value(client: AsyncClient):
     uid1 = str(uuid.uuid4())
     uid2 = str(uuid.uuid4())
@@ -287,7 +274,6 @@ async def test_user_cannot_update_other_users_value(client: AsyncClient):
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_user_cannot_delete_other_users_value(client: AsyncClient):
     uid1 = str(uuid.uuid4())
     uid2 = str(uuid.uuid4())
@@ -305,3 +291,62 @@ async def test_user_cannot_delete_other_users_value(client: AsyncClient):
         f"/tags/{tag_id}/values/{val_id}", headers={"X-User-ID": uid2}
     )
     assert resp.status_code == 404
+
+
+# --- Concurrent IntegrityError ---
+
+
+async def test_concurrent_duplicate_value_returns_409(
+    client: AsyncClient, user_id: uuid.UUID
+):
+    tag_resp = await client.post(
+        "/tags", json={"name": "conc-val-tag"}, headers={"X-User-ID": str(user_id)}
+    )
+    tag_id = tag_resp.json()["id"]
+
+    results = await asyncio.gather(
+        client.post(
+            f"/tags/{tag_id}/values",
+            json={"name": "concurrent-value"},
+            headers={"X-User-ID": str(user_id)},
+        ),
+        client.post(
+            f"/tags/{tag_id}/values",
+            json={"name": "concurrent-value"},
+            headers={"X-User-ID": str(user_id)},
+        ),
+    )
+
+    codes = {r.status_code for r in results}
+    assert codes == {201, 409}
+
+
+async def test_session_usable_after_value_concurrent_conflict(
+    client: AsyncClient, user_id: uuid.UUID
+):
+    tag_resp = await client.post(
+        "/tags",
+        json={"name": "val-session-recovery"},
+        headers={"X-User-ID": str(user_id)},
+    )
+    tag_id = tag_resp.json()["id"]
+
+    await asyncio.gather(
+        client.post(
+            f"/tags/{tag_id}/values",
+            json={"name": "crash-val"},
+            headers={"X-User-ID": str(user_id)},
+        ),
+        client.post(
+            f"/tags/{tag_id}/values",
+            json={"name": "crash-val"},
+            headers={"X-User-ID": str(user_id)},
+        ),
+    )
+
+    resp = await client.post(
+        f"/tags/{tag_id}/values",
+        json={"name": "after-crash"},
+        headers={"X-User-ID": str(user_id)},
+    )
+    assert resp.status_code == 201
