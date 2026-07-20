@@ -41,11 +41,13 @@ test:
   variables:
     POSTGRES_USER: postgres
     POSTGRES_PASSWORD: postgres
-    POSTGRES_DB: cloud_atlas_test
-    APP_DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/cloud_atlas_test
+    POSTGRES_DB: cloud_atlas
+    APP_DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/cloud_atlas
   script:
+    - apt-get update -qq && apt-get install -y -qq postgresql-client
     - pip install uv
     - uv sync --frozen
+    - psql postgresql://postgres:postgres@db:5432/cloud_atlas -c "CREATE DATABASE cloud_atlas_test"
     - uv run pytest
 
 audit:

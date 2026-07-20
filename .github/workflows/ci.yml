@@ -35,22 +35,23 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: cloud_atlas_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+      POSTGRES_DB: cloud_atlas
+    ports:
+      - 5432:5432
+    options: >-
+      --health-cmd "pg_isready -U postgres"
+      --health-interval 10s
+      --health-timeout 5s
+      --health-retries 5
     env:
-      APP_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cloud_atlas_test
+      APP_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/cloud_atlas
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
         with:
           python-version: "3.14"
       - run: uv sync --frozen
+      - run: psql postgresql://postgres:postgres@localhost:5432/cloud_atlas -c "CREATE DATABASE cloud_atlas_test"
       - run: uv run pytest
 
   audit:
