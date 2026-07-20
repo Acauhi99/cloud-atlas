@@ -110,14 +110,39 @@ curl "http://localhost:8000/tags?page=1&page_size=20&name=team" \
 
 ## Development
 
+### Before Committing
+
+Every code change must pass these checks before commit. Lefthook runs them automatically on `git commit`:
+
 ```bash
-# Lint + format + typecheck + tests
+uv run ruff format --check .   # formatting
+uv run ruff check .            # lint
+uv run mypy app                # typecheck
+uv run pytest                  # tests (requires PostgreSQL)
+```
+
+If any check fails, the commit is blocked. Fix the issues and try again.
+
+To skip hooks temporarily (not recommended): `git commit --no-verify`
+
+### Setup Hooks
+
+```bash
+lefthook install
+```
+
+This installs pre-commit hooks that run format, lint, typecheck, and tests on every commit.
+
+### Manual Checks
+
+```bash
+# Run all checks manually
 uv run ruff format --check .
 uv run ruff check .
 uv run mypy app
 uv run pytest
 
-# Run tests (requires PostgreSQL)
+# Run tests with verbose output
 uv run pytest tests/ -v
 ```
 

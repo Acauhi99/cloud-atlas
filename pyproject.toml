@@ -32,8 +32,12 @@ target-version = "py314"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
+[tool.fastapi]
+entrypoint = "app.main:app"
+
 [tool.mypy]
 python_version = "3.14"
 strict = false
 plugins = ["pydantic.mypy"]
 ignore_missing_imports = true
+explicit_package_bases = true
