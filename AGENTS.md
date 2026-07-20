@@ -39,13 +39,14 @@ app/
 ├── api/
 │   ├── dependencies.py  # FastAPI deps: get_user_id, get_session
 │   ├── error_handlers.py
-│   └── routes/
-│       ├── health.py    # GET /health, GET /ready
-│       ├── tags.py      # CRUD /tags
-│       └── values.py    # CRUD /tags/{tag_id}/values
+│   └── v1/              # API version 1 routes
+│       ├── health.py    # GET /v1/health, GET /v1/ready
+│       ├── tags.py      # CRUD /v1/tags
+│       └── values.py    # CRUD /v1/tags/{tag_id}/values
 ├── core/
 │   ├── config.py        # Pydantic Settings (APP_ env prefix)
-│   └── logging.py       # Structured logging, request_id context var
+│   ├── logging.py       # Structured logging, request_id context var
+│   └── rate_limit.py    # Rate limiting middleware (60 req/min per user)
 ├── db/
 │   ├── base.py          # SQLAlchemy DeclarativeBase
 │   ├── models.py        # Tag, Value ORM models
@@ -80,6 +81,29 @@ Transaction boundaries live in services. Repositories flush, never commit.
 ## User Scoping
 
 Every business endpoint requires `X-User-ID` header (UUID). Extracted via `get_user_id` dependency in `api/dependencies.py`. Never query without `user_id` filter. A resource from another user returns 404, never 403.
+
+## Rate Limiting
+
+All endpoints are rate-limited to 60 requests per minute per user (identified by `X-User-ID`). Implemented in `core/rate_limit.py` using sliding window in memory.
+
+Response headers:
+- `X-RateLimit-Limit`: Maximum requests per minute
+- `X-RateLimit-Remaining`: Requests remaining in current window
+
+Returns `429 Too Many Requests` when limit exceeded.
+
+**Note**: Rate limiting is in-memory (not distributed). When scaling horizontally, upgrade to Redis-based rate limiting.
+
+## API Versioning
+
+All routes are prefixed with `/v1`. When breaking changes are needed:
+
+1. Create `app/api/v2/` directory
+2. Copy and modify routes
+3. Register new router with `prefix="/v2"` in `main.py`
+4. Keep old version for backward compatibility
+
+This allows clients to migrate at their own pace.
 
 ## Name Validation
 
@@ -141,9 +165,25 @@ All prefixed with `APP_` (Pydantic Settings `env_prefix`):
 | `APP_LOG_LEVEL` | `INFO` | Logging level |
 | `APP_PORT` | `8000` | API port |
 
+## Request ID
+
+Every response includes `X-Request-ID` header for request tracing. Set via `request_id_middleware` in `main.py`. Clients can provide their own ID or the API generates one automatically.
+
+## Client SDK Generation
+
+Generate type-safe clients from OpenAPI spec:
+
+```bash
+./scripts/generate-client.sh typescript-axios ./clients/typescript
+./scripts/generate-client.sh python ./clients/python
+```
+
+Uses `openapi-generator-cli` and reads from `http://localhost:8000/openapi.json`. Supports 40+ languages.
+
 ## Gotchas
 
 - `conftest.py` uses `create_all`/`drop_all` for test isolation — not Alembic. Tests don't validate migration correctness.
 - PATCH endpoints reject empty body `{}` → 422.
 - `OptionalNameStr` in `schemas/common.py` validates regex — use it for optional name fields.
 - The `request_id_middleware` sets context vars for structured logging. Fields like `duration_ms` are populated at runtime, not in the format string defaults.
+- Rate limiting is in-memory — resets on server restart. Not suitable for multi-instance deployments without Redis.
