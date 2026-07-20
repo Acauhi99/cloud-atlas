@@ -2,12 +2,12 @@ from httpx import AsyncClient
 
 
 async def test_health(client: AsyncClient):
-    resp = await client.get("/health")
+    resp = await client.get("/v1/health")
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
 
 
 async def test_ready(client: AsyncClient):
-    resp = await client.get("/ready")
+    resp = await client.get("/v1/ready")
     assert resp.status_code == 200
     assert resp.json()["status"] == "ready"

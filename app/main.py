@@ -6,14 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from app.api.error_handlers import app_error_handler
-from app.api.routes import health, tags, values
+from app.api.v1 import health, tags, values
 from app.core.config import settings
 from app.core.logging import generate_request_id, request_id_var, setup_logging
+from app.core.rate_limit import RateLimitMiddleware
 from app.exceptions import AppError
 
 setup_logging(settings.log_level)
 
 app = FastAPI(title="Cloud Atlas Tags API", version="0.1.0")
+app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,9 +23,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_exception_handler(AppError, app_error_handler)  # type: ignore[arg-type]
-app.include_router(health.router)
-app.include_router(tags.router)
-app.include_router(values.router)
+app.include_router(health.router, prefix="/v1")
+app.include_router(tags.router, prefix="/v1")
+app.include_router(values.router, prefix="/v1")
 
 logger = logging.getLogger("uvicorn.access")
 
