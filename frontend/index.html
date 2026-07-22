@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Atlas — Tag Manager</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='1.5'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5z'/%3E%3Cpath d='M2 17l10 5 10-5'/%3E%3Cpath d='M2 12l10 5 10-5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body x-data="app()" x-init="init()">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+      <span class="brand-name">Cloud Atlas</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="user-section">
+      <h3>Current User</h3>
+      <p class="user-hint">Each request includes <code>X-User-ID</code> header. Resources are scoped per user.</p>
+      <div class="user-selector">
+        <select x-model="userPreset" @change="switchUser()">
+          <option value="">Custom...</option>
+          <option value="00000000-0000-0000-0000-000000000001">Alice</option>
+          <option value="00000000-0000-0000-0000-000000000002">Bob</option>
+        </select>
+        <input type="text" x-model="userId" @change="loadTags()" placeholder="Paste or generate UUID" spellcheck="false" :class="{ 'invalid': userId && !isValidUUID(userId) }">
+        <button type="button" class="btn btn-secondary btn-sm" @click="generateUserId()" title="Generate random UUID">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+          Generate
+        </button>
+      </div>
+    </section>
+
+    <section class="toolbar">
+      <h2>Tags</h2>
+      <div class="toolbar-actions">
+        <div class="search-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input type="text" x-model="search" placeholder="Filter by name..." class="search-input">
+        </div>
+        <button @click="openNewTagModal()" class="btn btn-primary" :disabled="!userId || !isValidUUID(userId)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          New Tag
+        </button>
+      </div>
+    </section>
+
+    <template x-if="loading">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <span>Loading tags...</span>
+      </div>
+    </template>
+
+    <template x-if="!loading && filteredTags.length === 0">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+          <line x1="7" y1="7" x2="7.01" y2="7"/>
+        </svg>
+        <template x-if="!userId || !isValidUUID(userId)">
+          <p>Select a user to view tags</p>
+        </template>
+        <template x-if="search">
+          <p>No tags match "<span x-text="search"></span>"</p>
+        </template>
+        <template x-if="userId && isValidUUID(userId) && !search">
+          <p>No tags yet. Create one to get started.</p>
+        </template>
+      </div>
+    </template>
+
+    <div class="tags-grid" x-show="!loading && filteredTags.length > 0">
+      <template x-for="tag in filteredTags" :key="tag.id">
+        <div class="tag-card" :class="{ 'expanded': expanded[tag.id] }">
+          <div class="tag-header" @click="toggleExpand(tag.id)">
+            <div class="tag-info">
+              <svg class="tag-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+              <div class="tag-meta">
+                <span class="tag-name" x-text="tag.name"></span>
+                <span class="tag-desc" x-show="tag.description" x-text="tag.description"></span>
+                <span class="tag-id" x-text="tag.id"></span>
+              </div>
+            </div>
+            <div class="tag-actions" @click.stop>
+              <span class="value-count" x-text="tag.values.length + ' value' + (tag.values.length !== 1 ? 's' : '')"></span>
+              <button class="btn btn-ghost btn-sm" @click="openEditTagModal(tag)">Edit</button>
+              <button class="btn btn-ghost btn-sm delete" @click="requestDelete('tag', tag)">Delete</button>
+            </div>
+          </div>
+          <div class="tag-body">
+            <div class="values-header">
+              <h4>Values</h4>
+              <button class="btn btn-secondary btn-sm" @click="openNewValueModal(tag)">+ Add Value</button>
+            </div>
+            <div class="values-list">
+              <template x-if="tag.values.length === 0">
+                <div class="empty-values">No values yet</div>
+              </template>
+              <template x-for="value in tag.values" :key="value.id">
+                <div class="value-item">
+                  <div class="value-meta">
+                    <span class="value-name" x-text="value.name"></span>
+                    <span class="value-desc" x-show="value.description" x-text="value.description"></span>
+                    <span class="value-id" x-text="value.id"></span>
+                  </div>
+                  <div class="value-actions">
+                    <button class="btn btn-ghost btn-sm" @click="openEditValueModal(tag, value)">Edit</button>
+                    <button class="btn btn-ghost btn-sm delete" @click="requestDelete('value', { tag, value })">Delete</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </main>
+
+  <!-- Create/Edit Modal -->
+  <div class="modal-overlay" x-show="modal.open && modal.type" x-transition:enter="fade-in" x-transition:leave="fade-out" @click.self="closeModal()" @keydown.escape.window="closeModal()">
+    <div class="modal" x-show="modal.open && modal.type" x-transition:enter="slide-up" x-transition:leave="slide-down">
+      <div class="modal-header">
+        <h3 x-text="modal.title"></h3>
+        <button class="modal-close" @click="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <template x-if="modal.type === 'tag'">
+          <form @submit.prevent="submitTagForm()">
+            <div class="form-group">
+              <label for="tag-name">Name <span class="required">*</span></label>
+              <input type="text" id="tag-name" x-model="modal.form.name" @input="validateName('name')" :class="{ 'invalid': modal.errors.name }" placeholder="e.g. team" autocomplete="off">
+              <template x-if="modal.errors.name">
+                <div class="error-text" x-text="modal.errors.name"></div>
+              </template>
+              <template x-if="!modal.errors.name">
+                <div class="hint">3-64 chars: lowercase, digits, underscore, hyphen</div>
+              </template>
+            </div>
+            <div class="form-group">
+              <label for="tag-desc">Description</label>
+              <textarea id="tag-desc" x-model="modal.form.description" placeholder="Optional" rows="2"></textarea>
+            </div>
+            <template x-if="modal.mode === 'create'">
+              <div class="form-group">
+                <div class="values-builder">
+                  <div class="values-builder-header">
+                    <span>Initial Values</span>
+                    <button type="button" class="btn btn-secondary btn-sm" @click="addValueRow()">+ Add</button>
+                  </div>
+                  <template x-if="modal.form.values.length === 0">
+                    <div class="empty-values small">No values added yet</div>
+                  </template>
+                  <template x-for="(val, idx) in modal.form.values" :key="idx">
+                    <div class="value-row">
+                      <div class="value-row-fields">
+                        <input type="text" x-model="val.name" @input="validateValueName(idx)" placeholder="name" :class="{ 'invalid': val.error }" autocomplete="off">
+                        <template x-if="val.error">
+                          <div class="error-text" x-text="val.error"></div>
+                        </template>
+                      </div>
+                      <input type="text" x-model="val.description" placeholder="description (optional)" class="value-row-desc">
+                      <button type="button" class="btn-remove-value" @click="removeValueRow(idx)">&times;</button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" @click="closeModal()">Cancel</button>
+              <button type="submit" class="btn btn-primary" :disabled="!isTagFormValid()">
+                <span x-text="modal.mode === 'create' ? 'Create' : 'Save'"></span>
+              </button>
+            </div>
+          </form>
+        </template>
+        <template x-if="modal.type === 'value'">
+          <form @submit.prevent="submitValueForm()">
+            <div class="form-group">
+              <label for="value-name">Name <span class="required">*</span></label>
+              <input type="text" id="value-name" x-model="modal.form.name" @input="validateName('name')" :class="{ 'invalid': modal.errors.name }" placeholder="e.g. atlas" autocomplete="off">
+              <template x-if="modal.errors.name">
+                <div class="error-text" x-text="modal.errors.name"></div>
+              </template>
+              <template x-if="!modal.errors.name">
+                <div class="hint">3-64 chars: lowercase, digits, underscore, hyphen</div>
+              </template>
+            </div>
+            <div class="form-group">
+              <label for="value-desc">Description</label>
+              <textarea id="value-desc" x-model="modal.form.description" placeholder="Optional" rows="2"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" @click="closeModal()">Cancel</button>
+              <button type="submit" class="btn btn-primary" :disabled="!isValueFormValid()">
+                <span x-text="modal.mode === 'create' ? 'Create' : 'Save'"></span>
+              </button>
+            </div>
+          </form>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div class="modal-overlay" x-show="confirmDel.open" x-transition:enter="fade-in" x-transition:leave="fade-out" @click.self="cancelDelete()" @keydown.escape.window="cancelDelete()">
+    <div class="modal confirm-modal" x-show="confirmDel.open" x-transition:enter="slide-up" x-transition:leave="slide-down">
+      <div class="modal-header">
+        <h3>Confirm Deletion</h3>
+        <button class="modal-close" @click="cancelDelete()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-content">
+          <svg class="confirm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="7" x2="12" y2="13"/>
+            <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+          <p x-text="confirmDel.message"></p>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" @click="cancelDelete()">Cancel</button>
+          <button class="btn btn-danger" @click="confirmDelete()" :disabled="confirmDel.loading">
+            <template x-if="confirmDel.loading">
+              <span class="spinner"></span>
+            </template>
+            <span x-text="confirmDel.loading ? 'Deleting...' : 'Delete'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container">
+    <template x-for="toast in toasts" :key="toast.id">
+      <div class="toast" :class="toast.type" x-text="toast.message" x-show="toast.visible" x-transition></div>
+    </template>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</body>
+</html>
