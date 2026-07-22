@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Acauhi99/cloud-atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/Acauhi99/cloud-atlas/actions/workflows/ci.yml)
 
-REST API for managing user-scoped Tags and their associated Values. Built with FastAPI, SQLAlchemy 2.x async, PostgreSQL, and Alembic.
+REST API for managing user-scoped Tags and their associated Values. Built with FastAPI, SQLAlchemy 2.x async, PostgreSQL, and Alembic. The repository also includes a small browser UI for exercising the API without an API client.
 
 ## Stack
 
@@ -13,6 +13,7 @@ REST API for managing user-scoped Tags and their associated Values. Built with F
 - pytest + pytest-asyncio + HTTPX
 - Ruff + mypy
 - Docker multi-stage build
+- Static HTML/CSS/JavaScript test UI (Alpine.js + native `fetch`)
 
 ## Quick Start
 
@@ -22,13 +23,35 @@ REST API for managing user-scoped Tags and their associated Values. Built with F
 - PostgreSQL 16+
 - uv
 
+### Fastest way: Docker Compose + browser UI
+
+Start the API and database:
+
+```bash
+docker compose up --build
+```
+
+In a second terminal, serve the static frontend:
+
+```bash
+uv run python -m http.server 3000 --directory frontend
+```
+
+Open [http://localhost:3000](http://localhost:3000). The frontend calls the API at `http://localhost:8000/v1` by default; Docker Compose exposes the API at that address. You can also inspect the OpenAPI documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+Stop the containers when finished:
+
+```bash
+docker compose down
+```
+
 ### Local Development
 
 ```bash
 # Install dependencies
 uv sync
 
-# Create database
+# Create database (PostgreSQL must be running locally)
 createdb cloud_atlas
 
 # Run migrations
@@ -36,6 +59,12 @@ uv run alembic upgrade head
 
 # Start the API
 uv run uvicorn app.main:app --reload
+```
+
+To use the browser UI with the locally running API, serve it in another terminal:
+
+```bash
+uv run python -m http.server 3000 --directory frontend
 ```
 
 ### Environment Variables
@@ -46,10 +75,19 @@ APP_LOG_LEVEL=INFO
 APP_PORT=8000
 ```
 
-### Docker Compose
+### Frontend test UI
 
-```bash
-docker compose up --build
+`frontend/` is a deliberately small, static interface for manually testing the API. It is not bundled into the FastAPI container, so serve it with a static web server as shown above.
+
+It supports listing, creating, editing, and deleting tags and values. Select Alice or Bob, paste a UUID, or generate one in the UI. Every request includes that UUID as the required `X-User-ID` header.
+
+The UI uses the browser's native `fetch`; it does not require a generated API client. Its API base URL can be overridden before `app.js` loads:
+
+```html
+<script>
+  window.CLOUD_ATLAS_API_URL = "https://api.example.com/v1";
+</script>
+<script src="app.js"></script>
 ```
 
 ## API
@@ -197,7 +235,11 @@ app/
 ├── db/                  # models, session factory
 ├── repositories/        # SQLAlchemy queries
 ├── schemas/             # Pydantic request/response
-└── services/            # Business logic, transactions
+├── services/            # Business logic, transactions
+└── frontend/            # Static browser UI for manually testing the API
+    ├── index.html
+    ├── app.js           # Native fetch requests to the v1 API
+    └── style.css
 ```
 
 Request flow: Router → Service → Repository → AsyncSession → PostgreSQL
@@ -248,7 +290,9 @@ Features:
 - PostgreSQL service for tests
 - Docker-in-Docker for image builds
 
-## Client SDK Generation
+## Optional OpenAPI client SDK generation
+
+The browser UI in `frontend/` uses native `fetch` and does not depend on generated code. This script is available only when another consumer needs a type-safe SDK generated from the OpenAPI specification.
 
 Generate type-safe client SDKs from the OpenAPI specification:
 
